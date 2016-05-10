@@ -1,0 +1,29 @@
+import numpy as np
+import pandas as pd
+import boto3
+client = boto3.client('dynamodb')
+def get_data():
+    data = [( u['UserID']['S'], set(eval(u['recipe_box']['S']) )) for u in client.scan(TableName="recipe_recommender_users")['Items'] ]
+    data = [(d,l) for d,l in data if len(l)>0]
+def create_adjacency_graph(data):
+    adjacency = []
+    for i, i_likes in data:
+        for j, j_likes in data:
+            jaccard = len(i_likes.intersection(j_likes))/len(i_likes.union(j_likes))
+            print(i,j,jaccard)
+            adjacency += [(i,j,jaccard)]
+def write_adjacency_csv(a,filename):
+    f = open(filename,'w')
+    f.write(';' + ';'.join([str(i) for i in range(len(user_ids))]))
+    for i,j,l in adjacency:
+        f.write("{},{},{}\n".format(i,j,l))
+    f.close()
+
+user_ids = [i for i,j in data]
+adj = np.zeros(shape=(len(user_ids),len(user_ids)))
+for i,j,l in adjacency:
+    adj[user_ids.index(i),user_ids.index(j)] = l
+
+df = pd.DataFrame(adj)
+df[df<0.05] = 0
+df.to_csv('adj.csv',sep=';')
